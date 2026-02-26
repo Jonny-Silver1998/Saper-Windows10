@@ -1,1 +1,561 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Windows 10 Metro Minesweeper</title>
+  <style>
+    :root {
+      --bg-dark: #0f1114;
+      --panel: rgba(35, 39, 46, 0.95);
+      --panel-soft: rgba(255, 255, 255, 0.06);
+      --accent: #0078d7;
+      --accent-2: #00bcf2;
+      --danger: #d13438;
+      --ok: #107c10;
+      --tile-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+      --text: #f3f5f7;
+      --muted: #bfc5ce;
+      --cell: #23384f;
+      --cell-open: #e6edf5;
+    }
 
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 20% 20%, #1b63a6 0%, transparent 42%),
+        radial-gradient(circle at 80% 0%, #0e3557 0%, transparent 30%),
+        linear-gradient(145deg, #11161d 0%, #090b0f 100%);
+      overflow: hidden;
+    }
+
+    .desktop {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      position: relative;
+      padding: 1.2rem;
+    }
+
+    .hero {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      max-width: 620px;
+      gap: .8rem;
+      text-shadow: 0 3px 14px rgba(0, 0, 0, .5);
+      animation: fadeIn .8s ease;
+    }
+
+    .hero h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); font-weight: 600; }
+    .hero p { margin: 0; color: var(--muted); font-size: 1.1rem; }
+
+    .taskbar {
+      height: 54px;
+      background: rgba(8, 10, 13, 0.96);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 .8rem;
+      border-radius: 10px 10px 0 0;
+      backdrop-filter: blur(8px);
+    }
+
+    .left-controls, .right-controls { display: flex; align-items: center; gap: .55rem; }
+
+    .win-btn {
+      width: 40px;
+      height: 40px;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      background: transparent;
+      cursor: pointer;
+      font-size: 1.2rem;
+      transition: .2s ease;
+    }
+
+    .win-btn:hover { background: rgba(255,255,255,.12); }
+
+    .clock {
+      color: #e9edf2;
+      font-size: .85rem;
+      line-height: 1.2;
+      text-align: right;
+      min-width: 72px;
+    }
+
+    .start-menu {
+      position: absolute;
+      bottom: 66px;
+      left: 1.2rem;
+      width: min(880px, calc(100vw - 2.4rem));
+      max-height: 78vh;
+      background: rgba(19, 23, 29, .95);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 10px;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 22px 48px rgba(0,0,0,.42);
+      transform-origin: bottom left;
+      transform: scale(.96) translateY(10px);
+      opacity: 0;
+      pointer-events: none;
+      transition: .25s ease;
+      display: grid;
+      grid-template-columns: 230px 1fr;
+      overflow: hidden;
+      z-index: 12;
+    }
+
+    .start-menu.open {
+      transform: scale(1) translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .menu-sidebar {
+      background: rgba(0,0,0,.28);
+      padding: 1rem;
+      border-right: 1px solid rgba(255,255,255,.08);
+    }
+
+    .menu-sidebar h2 {
+      margin: 0 0 1rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #c7d2df;
+      letter-spacing: .4px;
+    }
+
+    .menu-list {
+      display: grid;
+      gap: .6rem;
+    }
+
+    .menu-item {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      color: var(--text);
+      padding: .65rem .7rem;
+      border-radius: 6px;
+      font-size: .9rem;
+    }
+
+    .tiles-wrap {
+      padding: 1rem;
+      display: grid;
+      gap: .8rem;
+      align-content: start;
+    }
+
+    .tiles-wrap h3 {
+      margin: 0;
+      color: #dce6f3;
+      font-size: 1rem;
+    }
+
+    .tiles {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(95px, 1fr));
+      gap: .65rem;
+    }
+
+    .tile {
+      border: none;
+      color: #fff;
+      border-radius: 8px;
+      min-height: 84px;
+      text-align: left;
+      padding: .8rem;
+      cursor: pointer;
+      box-shadow: var(--tile-shadow);
+      transition: transform .15s ease, filter .15s ease;
+      font-size: .84rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      font-weight: 600;
+    }
+
+    .tile:hover { transform: translateY(-2px); filter: brightness(1.05); }
+    .tile small { opacity: .85; font-weight: 400; }
+
+    .blue { background: linear-gradient(145deg, #0066b4, #0e8adf); }
+    .cyan { background: linear-gradient(145deg, #0098c9, #00c0f0); }
+    .green { background: linear-gradient(145deg, #107c10, #2faf2f); }
+    .purple { background: linear-gradient(145deg, #6b2ea3, #9447d0); }
+    .orange { background: linear-gradient(145deg, #c14e00, #e57e00); }
+
+    .game-panel {
+      position: absolute;
+      right: 1.2rem;
+      top: 1.2rem;
+      width: min(420px, calc(100vw - 2.4rem));
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 12px;
+      box-shadow: 0 20px 34px rgba(0,0,0,.38);
+      padding: 1rem;
+      display: grid;
+      gap: .8rem;
+      z-index: 10;
+    }
+
+    .game-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: .8rem;
+    }
+
+    .stats { display: flex; gap: .5rem; }
+
+    .badge {
+      background: var(--panel-soft);
+      border: 1px solid rgba(255,255,255,.13);
+      padding: .35rem .6rem;
+      border-radius: 6px;
+      font-size: .86rem;
+      color: #ebf0f7;
+    }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(9, 34px);
+      gap: 4px;
+      justify-content: center;
+      user-select: none;
+    }
+
+    .cell {
+      width: 34px;
+      height: 34px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: .95rem;
+      color: #0f1f31;
+      background: var(--cell);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      transition: .12s;
+    }
+
+    .cell:hover { filter: brightness(1.15); }
+    .cell.open { background: var(--cell-open); cursor: default; }
+    .cell.flagged { background: #243d58; color: #f9ca24; }
+    .cell.mine { background: #f5c2c4; color: var(--danger); }
+
+    .n1 { color: #0056b3; }
+    .n2 { color: #107c10; }
+    .n3 { color: #d83b01; }
+    .n4 { color: #5c2d91; }
+    .n5 { color: #8b1f3a; }
+    .n6 { color: #008272; }
+    .n7 { color: #333; }
+    .n8 { color: #666; }
+
+    .status {
+      margin: 0;
+      font-size: .92rem;
+      color: #d7e0ec;
+      min-height: 1.3rem;
+    }
+
+    @media (max-width: 940px) {
+      .game-panel {
+        position: static;
+        margin-top: 1rem;
+        width: 100%;
+      }
+      .desktop { overflow: auto; }
+      .start-menu { width: calc(100vw - 2.4rem); grid-template-columns: 1fr; }
+      .menu-sidebar { display: none; }
+    }
+
+    @keyframes fadeIn {
+      from { transform: translateY(8px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <main class="desktop">
+    <section class="hero">
+      <h1>Windows 10: Сапёр Metro Edition</h1>
+      <p>Нажми Пуск и запусти плитку <strong>Играть</strong>, чтобы открыть сапёр в стиле позднего Metro UI.</p>
+    </section>
+
+    <section class="game-panel" aria-label="Панель игры">
+      <div class="game-head">
+        <strong>Сапёр</strong>
+        <div class="stats">
+          <span class="badge" id="mineCount">💣 10</span>
+          <span class="badge" id="timer">⏱ 0</span>
+        </div>
+      </div>
+      <div id="board" aria-label="Игровое поле"></div>
+      <p class="status" id="statusText">ЛКМ — открыть клетку, ПКМ — поставить флаг.</p>
+      <button class="menu-item" id="restartBtn" type="button">Новая игра</button>
+    </section>
+
+    <div class="start-menu" id="startMenu" aria-hidden="true">
+      <aside class="menu-sidebar">
+        <h2>Пуск</h2>
+        <div class="menu-list">
+          <div class="menu-item">Проводник</div>
+          <div class="menu-item">Параметры</div>
+          <div class="menu-item">Фотографии</div>
+          <div class="menu-item">Power</div>
+        </div>
+      </aside>
+
+      <section class="tiles-wrap">
+        <h3>Закреплённые плитки</h3>
+        <div class="tiles">
+          <button class="tile green"><span>Xbox</span><small>Live</small></button>
+          <button class="tile cyan"><span>Новости</span><small>Metro feed</small></button>
+          <button class="tile purple"><span>Почта</span><small>Inbox</small></button>
+          <button class="tile orange"><span>Store</span><small>Apps</small></button>
+          <button class="tile blue" id="playTile"><span>Играть</span><small>Сапёр</small></button>
+        </div>
+      </section>
+    </div>
+
+    <footer class="taskbar">
+      <div class="left-controls">
+        <button class="win-btn" id="startBtn" title="Открыть Пуск">⊞</button>
+        <button class="win-btn" title="Поиск">🔎</button>
+      </div>
+      <div class="right-controls">
+        <div class="clock" id="clock">--:--<br/>--.--.----</div>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    const boardElement = document.getElementById('board');
+    const mineCountEl = document.getElementById('mineCount');
+    const timerEl = document.getElementById('timer');
+    const statusText = document.getElementById('statusText');
+    const restartBtn = document.getElementById('restartBtn');
+
+    const startBtn = document.getElementById('startBtn');
+    const startMenu = document.getElementById('startMenu');
+    const playTile = document.getElementById('playTile');
+
+    const SIZE = 9;
+    const MINES = 10;
+
+    let board = [];
+    let opened = 0;
+    let flags = 0;
+    let gameOver = false;
+    let started = false;
+    let seconds = 0;
+    let timerInt;
+
+    function initBoard() {
+      clearInterval(timerInt);
+      seconds = 0;
+      timerEl.textContent = '⏱ 0';
+      started = false;
+      gameOver = false;
+      opened = 0;
+      flags = 0;
+      statusText.textContent = 'ЛКМ — открыть клетку, ПКМ — поставить флаг.';
+
+      board = Array.from({ length: SIZE }, () =>
+        Array.from({ length: SIZE }, () => ({
+          mine: false,
+          open: false,
+          flagged: false,
+          count: 0
+        }))
+      );
+
+      let placed = 0;
+      while (placed < MINES) {
+        const r = Math.floor(Math.random() * SIZE);
+        const c = Math.floor(Math.random() * SIZE);
+        if (!board[r][c].mine) {
+          board[r][c].mine = true;
+          placed++;
+        }
+      }
+
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (board[r][c].mine) continue;
+          let count = 0;
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              const nr = r + dr;
+              const nc = c + dc;
+              if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc].mine) {
+                count++;
+              }
+            }
+          }
+          board[r][c].count = count;
+        }
+      }
+
+      draw();
+      updateMineCounter();
+    }
+
+    function startTimer() {
+      if (started) return;
+      started = true;
+      timerInt = setInterval(() => {
+        seconds++;
+        timerEl.textContent = `⏱ ${seconds}`;
+      }, 1000);
+    }
+
+    function draw() {
+      boardElement.innerHTML = '';
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const cell = board[r][c];
+          const btn = document.createElement('button');
+          btn.className = 'cell';
+          btn.dataset.r = r;
+          btn.dataset.c = c;
+
+          if (cell.open) {
+            btn.classList.add('open');
+            if (cell.mine) {
+              btn.classList.add('mine');
+              btn.textContent = '💣';
+            } else if (cell.count > 0) {
+              btn.textContent = cell.count;
+              btn.classList.add(`n${cell.count}`);
+            }
+          } else if (cell.flagged) {
+            btn.classList.add('flagged');
+            btn.textContent = '🚩';
+          }
+
+          btn.addEventListener('click', () => openCell(r, c));
+          btn.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            flagCell(r, c);
+          });
+          boardElement.appendChild(btn);
+        }
+      }
+    }
+
+    function openCell(r, c) {
+      if (gameOver) return;
+      const cell = board[r][c];
+      if (cell.open || cell.flagged) return;
+      startTimer();
+
+      cell.open = true;
+      opened++;
+
+      if (cell.mine) {
+        lose();
+        return;
+      }
+
+      if (cell.count === 0) {
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            const nr = r + dr;
+            const nc = c + dc;
+            if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && !board[nr][nc].open) {
+              openCell(nr, nc);
+            }
+          }
+        }
+      }
+
+      if (opened === SIZE * SIZE - MINES) {
+        win();
+      }
+
+      draw();
+    }
+
+    function flagCell(r, c) {
+      if (gameOver) return;
+      const cell = board[r][c];
+      if (cell.open) return;
+      startTimer();
+
+      cell.flagged = !cell.flagged;
+      flags += cell.flagged ? 1 : -1;
+      updateMineCounter();
+      draw();
+    }
+
+    function updateMineCounter() {
+      mineCountEl.textContent = `💣 ${Math.max(MINES - flags, 0)}`;
+    }
+
+    function lose() {
+      gameOver = true;
+      clearInterval(timerInt);
+      statusText.textContent = '💥 Бум! Ты подорвался. Нажми «Новая игра». ';
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (board[r][c].mine) board[r][c].open = true;
+        }
+      }
+      draw();
+    }
+
+    function win() {
+      gameOver = true;
+      clearInterval(timerInt);
+      statusText.textContent = '🏆 Победа! Поле очищено как в лучших традициях Windows.';
+      draw();
+    }
+
+    function updateClock() {
+      const el = document.getElementById('clock');
+      const now = new Date();
+      const time = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      const date = now.toLocaleDateString('ru-RU');
+      el.innerHTML = `${time}<br/>${date}`;
+    }
+
+    function toggleStartMenu(force) {
+      const willOpen = typeof force === 'boolean' ? force : !startMenu.classList.contains('open');
+      startMenu.classList.toggle('open', willOpen);
+      startMenu.setAttribute('aria-hidden', String(!willOpen));
+    }
+
+    startBtn.addEventListener('click', () => toggleStartMenu());
+    playTile.addEventListener('click', () => {
+      toggleStartMenu(false);
+      statusText.textContent = 'Игровой режим активирован через плитку «Играть». Удачи!';
+      document.querySelector('.game-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    document.addEventListener('click', (event) => {
+      const insideMenu = startMenu.contains(event.target);
+      const onStartBtn = startBtn.contains(event.target);
+      if (!insideMenu && !onStartBtn) {
+        toggleStartMenu(false);
+      }
+    });
+
+    restartBtn.addEventListener('click', initBoard);
+    updateClock();
+    setInterval(updateClock, 1000);
+    initBoard();
+  </script>
+</body>
+</html>
